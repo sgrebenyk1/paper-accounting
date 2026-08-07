@@ -1,0 +1,6 @@
+{
+  "name": "Учет бумаги",
+  "description": "Учет остатков бумаги в типографии с расчетом стопы и экспортом в PDF для Telegram",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -65,7 +68,7 @@ import com.example.ui.theme.M3OnPurpleContainer
 import com.example.ui.theme.M3PurpleContainer
 import com.example.ui.theme.M3PurplePrimary
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PaperInventoryScreen(
     viewModel: PaperViewModel
@@ -99,7 +102,7 @@ fun PaperInventoryScreen(
     }
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        contentWindowInsets = WindowInsets.statusBars,
         bottomBar = {
             Surface(
                 modifier = Modifier
@@ -186,15 +189,10 @@ fun PaperInventoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 16.dp,
-                bottom = 16.dp
-            ),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. Dashboard Header
+            // 1. Enlarged Dark Dashboard Header containing stats and search box
             item {
                 DashboardHeader(
                     totalTypes = totalTypes,
@@ -202,21 +200,21 @@ fun PaperInventoryScreen(
                     lowStockCount = lowStockCount,
                     totalMeters = totalMeters,
                     onOpenCalculator = { viewModel.isCalculatorOpen.value = true },
-                    onGeneratePdf = { viewModel.generatePdfReport(context) }
+                    onGeneratePdf = { viewModel.generatePdfReport(context) },
+                    searchQuery = searchQuery,
+                    onSearchChange = { viewModel.onSearchQueryChange(it) },
+                    sortBy = sortBy,
+                    onSortSelect = { viewModel.setSortBy(it) }
                 )
             }
 
-            // 2. Search & Filters
+            // 2. Category Type Filters
             item {
                 PaperSearchAndFilter(
-                    searchQuery = searchQuery,
-                    onSearchChange = { viewModel.onSearchQueryChange(it) },
                     selectedCategory = selectedPaperType,
                     onCategorySelect = { viewModel.onPaperTypeSelect(it) },
                     showLowStockOnly = showLowStockOnly,
-                    onToggleLowStockOnly = { viewModel.toggleLowStockOnly() },
-                    sortBy = sortBy,
-                    onSortSelect = { viewModel.setSortBy(it) }
+                    onToggleLowStockOnly = { viewModel.toggleLowStockOnly() }
                 )
             }
 

@@ -71,8 +71,8 @@ fun AddEditPaperDialog(
     var isErrorName by remember { mutableStateOf(false) }
 
     val presetDensities = listOf("80", "115", "130", "150", "170", "200", "250", "300", "350")
-    val paperTypes = listOf("Мелованная глянцевая", "Мелованная матовая", "Офсетная", "Картон", "Крафт", "Самоклейка")
-    val formats = listOf("SRA3 (32x45)", "A3 (29.7x42)", "A4 (21x29.7)", "70x100 см", "62x94 см")
+    val paperTypes = listOf("Мелованная глянцевая", "Мелованная матовая", "Офсетная", "Картон", "Крафт", "Самоклейка", "Дизайнерская")
+    val formats = listOf("A1 (59.4x84.1)", "A2 (42x59.4)", "A3 (29.7x42)", "A4 (21x29.7)", "A5 (14.8x21)", "SRA3 (32x45)", "SRA4 (22.5x32)", "70x100 см", "62x94 см", "A0 (84.1x118.9)")
 
     // Helper for live calculation
     fun updateSheetsFromCm(cmInput: String) {
@@ -217,6 +217,20 @@ fun AddEditPaperDialog(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = format,
+                    onValueChange = { format = it },
+                    label = { Text("Точный формат / размер листа") },
+                    placeholder = { Text("например, А1, А2, А3, SRA3, 70x100 см") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_format"),
+                    shape = RoundedCornerShape(12.dp)
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 

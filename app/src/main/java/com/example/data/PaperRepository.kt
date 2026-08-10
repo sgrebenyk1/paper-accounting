@@ -213,8 +213,25 @@ class PaperRepository(private val context: Context? = null) {
 
     val allPapers: StateFlow<List<PaperItem>> = localItems.asStateFlow()
 
+    private val auth = try {
+        com.google.firebase.auth.FirebaseAuth.getInstance().apply {
+            if (currentUser == null) {
+                signInAnonymously().addOnSuccessListener {
+                    Log.d("PaperRepository", "Signed in anonymously to Firebase")
+                }.addOnFailureListener { e ->
+                    Log.e("PaperRepository", "Anonymous sign in failed", e)
+                }
+            }
+        }
+    } catch (e: Throwable) {
+        Log.w("PaperRepository", "FirebaseAuth not available", e)
+        null
+    }
+
     private val firestore: FirebaseFirestore? = try {
-        FirebaseFirestore.getInstance()
+        FirebaseFirestore.getInstance().apply {
+            enableNetwork()
+        }
     } catch (e: Throwable) {
         Log.w("PaperRepository", "Firestore not available, using local storage", e)
         null
@@ -234,7 +251,7 @@ class PaperRepository(private val context: Context? = null) {
                     Log.e("PaperRepository", "Firestore listen error: ${error.message}", error)
                     return@addSnapshotListener
                 }
-                if (snapshot != null && !snapshot.metadata.hasPendingWrites()) {
+                if (snapshot != null) {
                     val items = snapshot.documents.mapNotNull { doc ->
                         try {
                             doc.toObject(PaperItem::class.java)?.copy(id = doc.id)
@@ -243,7 +260,7 @@ class PaperRepository(private val context: Context? = null) {
                             null
                         }
                     }
-                    if (items.isNotEmpty()) {
+                    if (items.isNotEmpty() || !snapshot.metadata.isFromCache) {
                         localItems.value = items
                         saveLocalToDisk(items)
                     }
@@ -326,7 +343,7 @@ class PaperRepository(private val context: Context? = null) {
     suspend fun prepopulateIfEmpty() {
         val col = collection ?: return
         try {
-            col.limit(1).get()
+            col.limit(1).get(com.google.firebase.firestore.Source.SERVER)
                 .addOnSuccessListener { snapshot ->
                     if (snapshot.isEmpty) {
                         firestore?.runBatch { batch ->
@@ -336,6 +353,9 @@ class PaperRepository(private val context: Context? = null) {
                             }
                         }
                     }
+                }
+                .addOnFailureListener { e ->
+                    Log.w("PaperRepository", "Server fetch for prepopulate failed or offline: ${e.message}")
                 }
         } catch (e: Throwable) {
             Log.e("PaperRepository", "Error checking or prepopulating Firestore", e)

@@ -234,7 +234,7 @@ class PaperRepository(private val context: Context? = null) {
                     Log.e("PaperRepository", "Firestore listen error: ${error.message}", error)
                     return@addSnapshotListener
                 }
-                if (snapshot != null && !snapshot.isEmpty) {
+                if (snapshot != null && !snapshot.metadata.hasPendingWrites()) {
                     val items = snapshot.documents.mapNotNull { doc ->
                         try {
                             doc.toObject(PaperItem::class.java)?.copy(id = doc.id)
@@ -244,15 +244,8 @@ class PaperRepository(private val context: Context? = null) {
                         }
                     }
                     if (items.isNotEmpty()) {
-                        val localMap = localItems.value.associateBy { it.id }.toMutableMap()
-                        items.forEach { remoteItem ->
-                            localMap[remoteItem.id] = remoteItem
-                        }
-                        val updated = localMap.values.toList()
-                        if (updated != localItems.value) {
-                            localItems.value = updated
-                            saveLocalToDisk(updated)
-                        }
+                        localItems.value = items
+                        saveLocalToDisk(items)
                     }
                 }
             }
@@ -266,16 +259,17 @@ class PaperRepository(private val context: Context? = null) {
         val newId = if (paper.id.isNotEmpty()) paper.id else UUID.randomUUID().toString()
         val paperWithId = paper.copy(id = newId)
         
-        // Update local immediately for responsive UI
+        // Update local immediately for instant UI response
         insertLocal(paperWithId)
 
         if (col != null) {
             try {
-                withTimeoutOrNull(1000L) {
-                    col.document(newId).set(paperWithId).await()
-                }
+                col.document(newId).set(paperWithId)
+                    .addOnFailureListener { e ->
+                        Log.e("PaperRepository", "Error inserting to Firestore", e)
+                    }
             } catch (e: Throwable) {
-                Log.e("PaperRepository", "Error inserting to Firestore", e)
+                Log.e("PaperRepository", "Error initiating Firestore insert", e)
             }
         }
         return newId
@@ -292,11 +286,12 @@ class PaperRepository(private val context: Context? = null) {
         val col = collection
         if (col != null && paper.id.isNotEmpty()) {
             try {
-                withTimeoutOrNull(1000L) {
-                    col.document(paper.id).set(paper).await()
-                }
+                col.document(paper.id).set(paper)
+                    .addOnFailureListener { e ->
+                        Log.e("PaperRepository", "Error updating Firestore", e)
+                    }
             } catch (e: Throwable) {
-                Log.e("PaperRepository", "Error updating Firestore", e)
+                Log.e("PaperRepository", "Error initiating Firestore update", e)
             }
         }
     }
@@ -312,11 +307,12 @@ class PaperRepository(private val context: Context? = null) {
         val col = collection
         if (col != null && id.isNotEmpty()) {
             try {
-                withTimeoutOrNull(1000L) {
-                    col.document(id).delete().await()
-                }
+                col.document(id).delete()
+                    .addOnFailureListener { e ->
+                        Log.e("PaperRepository", "Error deleting from Firestore", e)
+                    }
             } catch (e: Throwable) {
-                Log.e("PaperRepository", "Error deleting from Firestore", e)
+                Log.e("PaperRepository", "Error initiating Firestore delete", e)
             }
         }
     }
@@ -330,17 +326,17 @@ class PaperRepository(private val context: Context? = null) {
     suspend fun prepopulateIfEmpty() {
         val col = collection ?: return
         try {
-            withTimeoutOrNull(1000L) {
-                val snapshot = col.limit(1).get().await()
-                if (snapshot.isEmpty) {
-                    firestore?.runBatch { batch ->
-                        localItems.value.forEach { item ->
-                            val ref = col.document()
-                            batch.set(ref, item.copy(id = ref.id))
+            col.limit(1).get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot.isEmpty) {
+                        firestore?.runBatch { batch ->
+                            localItems.value.forEach { item ->
+                                val ref = col.document(item.id.ifEmpty { UUID.randomUUID().toString() })
+                                batch.set(ref, item.copy(id = ref.id))
+                            }
                         }
-                    }?.await()
+                    }
                 }
-            }
         } catch (e: Throwable) {
             Log.e("PaperRepository", "Error checking or prepopulating Firestore", e)
         }

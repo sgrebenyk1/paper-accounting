@@ -142,6 +142,31 @@ fun DashboardHeader(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        androidx.compose.material3.Surface(
+                            color = Color(0xFF10B981).copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(Color(0xFF34D399), shape = androidx.compose.foundation.shape.CircleShape)
+                                )
+                                Text(
+                                    text = "Облако: Онлайн-синхронизация",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = Color(0xFFA7F3D0),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))

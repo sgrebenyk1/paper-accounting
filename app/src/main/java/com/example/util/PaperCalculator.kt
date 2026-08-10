@@ -15,6 +15,7 @@ object PaperCalculator {
             typeLower.contains("офсет") || typeLower.contains("offset") -> 1.25
             typeLower.contains("картон") || typeLower.contains("cardboard") -> 1.40
             typeLower.contains("самоклей") || typeLower.contains("adhesive") -> 1.10
+            typeLower.contains("этикет") || typeLower.contains("label") -> 0.95
             else -> 1.00
         }
         return (densityGsm * factor).coerceAtLeast(40.0)

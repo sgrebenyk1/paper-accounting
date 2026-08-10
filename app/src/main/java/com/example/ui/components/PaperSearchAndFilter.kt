@@ -39,7 +39,7 @@ fun PaperSearchAndFilter(
     onToggleLowStockOnly: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val categories = listOf("Все", "Мелованная", "Офсетная", "Картон", "Крафт", "Дизайнерская", "Самоклейка")
+    val categories = listOf("Все", "Мелованная", "Офсетная", "Картон", "Крафт", "Дизайнерская", "Самоклейка", "Этикеточная")
 
     Column(modifier = modifier.fillMaxWidth()) {
         // Section Label for Category / Paper Type

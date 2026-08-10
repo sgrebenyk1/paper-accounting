@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.AppDatabase
 import com.example.data.PaperItem
 import com.example.data.PaperRepository
 import com.example.util.PaperCalculator
@@ -30,8 +29,7 @@ class PaperViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: PaperRepository
 
     init {
-        val database = AppDatabase.getDatabase(application)
-        repository = PaperRepository(database.paperDao())
+        repository = PaperRepository()
         viewModelScope.launch {
             repository.prepopulateIfEmpty()
         }
@@ -70,6 +68,9 @@ class PaperViewModel(application: Application) : AndroidViewModel(application) {
                 "Офсетная" -> item.paperType.contains("офсет", ignoreCase = true)
                 "Картон" -> item.paperType.contains("картон", ignoreCase = true)
                 "Крафт" -> item.paperType.contains("крафт", ignoreCase = true)
+                "Самоклейка" -> item.paperType.contains("самоклей", ignoreCase = true)
+                "Дизайнерская" -> item.paperType.contains("дизайн", ignoreCase = true)
+                "Этикеточная" -> item.paperType.contains("этикет", ignoreCase = true)
                 else -> item.paperType.equals(paperType, ignoreCase = true)
             }
 
@@ -78,7 +79,7 @@ class PaperViewModel(application: Application) : AndroidViewModel(application) {
             matchesSearch && matchesType && matchesLowStock
         }.let { list ->
             when (sort) {
-                SortOption.NAME_ASC -> list.sortedBy { it.name.lowercase() }
+                SortOption.NAME_ASC -> list.sortedWith(compareBy({ it.name.lowercase() }, { it.format.lowercase() }, { it.densityGsm }))
                 SortOption.SHEETS_ASC -> list.sortedBy { it.sheetsCount }
                 SortOption.SHEETS_DESC -> list.sortedByDescending { it.sheetsCount }
                 SortOption.DENSITY_DESC -> list.sortedByDescending { it.densityGsm }
@@ -151,7 +152,7 @@ class PaperViewModel(application: Application) : AndroidViewModel(application) {
 
     fun savePaperItem(paperItem: PaperItem) {
         viewModelScope.launch {
-            if (paperItem.id == 0L) {
+            if (paperItem.id.isEmpty()) {
                 repository.insert(paperItem)
                 toastMessage.value = "Бумага добавлена"
             } else {
@@ -162,7 +163,7 @@ class PaperViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun deletePaperItem(id: Long) {
+    fun deletePaperItem(id: String) {
         viewModelScope.launch {
             repository.deleteById(id)
             toastMessage.value = "Позиция удалена"

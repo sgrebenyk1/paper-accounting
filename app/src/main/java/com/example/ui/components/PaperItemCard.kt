@@ -102,6 +102,15 @@ fun PaperItemCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Формат: ${item.format}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = M3TextSecondary
+                        )
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))

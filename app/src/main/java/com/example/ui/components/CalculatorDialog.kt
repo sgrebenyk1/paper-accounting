@@ -59,7 +59,7 @@ fun CalculatorDialog(
     var inputSheetsStr by remember { mutableStateOf("1000") }
 
     val densities = listOf("80", "115", "130", "150", "170", "200", "250", "300", "350")
-    val types = listOf("Мелованная глянцевая", "Мелованная матовая", "Офсетная", "Картон")
+    val types = listOf("Мелованная глянцевая", "Мелованная матовая", "Офсетная", "Картон", "Крафт", "Самоклейка", "Дизайнерская", "Этикеточная")
 
     val currentDensity = densityGsmStr.toIntOrNull() ?: 130
     val estimatedCaliper = PaperCalculator.estimateCaliperMicrons(currentDensity, paperType)

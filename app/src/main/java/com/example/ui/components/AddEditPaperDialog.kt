@@ -37,15 +37,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.data.PaperItem
 import com.example.ui.theme.CyanPrimary
 import com.example.ui.theme.SlateNavy
@@ -58,17 +61,19 @@ fun AddEditPaperDialog(
     onDismiss: () -> Unit,
     onSave: (PaperItem) -> Unit
 ) {
-    var name by remember { mutableStateOf(item?.name ?: "") }
-    var densityGsmStr by remember { mutableStateOf(item?.densityGsm?.toString() ?: "130") }
-    var paperType by remember { mutableStateOf(item?.paperType ?: "Мелованная глянцевая") }
-    var format by remember { mutableStateOf(item?.format ?: "SRA3 (32x45)") }
-    var thicknessCmStr by remember { mutableStateOf(item?.thicknessCm?.toString() ?: "10.0") }
-    var sheetsCountStr by remember { mutableStateOf(item?.sheetsCount?.toString() ?: "1000") }
-    var minThresholdStr by remember { mutableStateOf(item?.minThresholdSheets?.toString() ?: "200") }
-    var location by remember { mutableStateOf(item?.location ?: "Стеллаж А-1") }
-    var notes by remember { mutableStateOf(item?.notes ?: "") }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
-    var isErrorName by remember { mutableStateOf(false) }
+    var name by remember(item) { mutableStateOf(item?.name ?: "") }
+    var densityGsmStr by remember(item) { mutableStateOf(item?.densityGsm?.toString() ?: "130") }
+    var paperType by remember(item) { mutableStateOf(item?.paperType ?: "Мелованная глянцевая") }
+    var format by remember(item) { mutableStateOf(item?.format ?: "SRA3 (32x45)") }
+    var thicknessCmStr by remember(item) { mutableStateOf(item?.thicknessCm?.toString() ?: "10.0") }
+    var sheetsCountStr by remember(item) { mutableStateOf(item?.sheetsCount?.toString() ?: "1000") }
+    var minThresholdStr by remember(item) { mutableStateOf(item?.minThresholdSheets?.toString() ?: "200") }
+    var location by remember(item) { mutableStateOf(item?.location ?: "Стеллаж А-1") }
+    var notes by remember(item) { mutableStateOf(item?.notes ?: "") }
+
+    var isErrorName by remember(item) { mutableStateOf(false) }
 
     val presetDensities = listOf("80", "115", "130", "150", "170", "200", "250", "300", "350")
     val paperTypes = listOf("Мелованная глянцевая", "Мелованная матовая", "Офсетная", "Картон", "Крафт", "Самоклейка", "Дизайнерская", "Этикеточная")
@@ -91,31 +96,43 @@ fun AddEditPaperDialog(
         thicknessCmStr = "$cm"
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false
+        )
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .fillMaxWidth(0.92f)
+                .heightIn(max = 680.dp)
+                .padding(vertical = 12.dp)
                 .testTag("add_edit_dialog_card"),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState())
+                modifier = Modifier.fillMaxWidth()
             ) {
+                // Header (Pinned)
                 Text(
                     text = if (item == null) "Добавить бумагу" else "Редактировать бумагу",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         color = SlateNavy,
                         fontSize = 20.sp
-                    )
+                    ),
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // Scrollable Form Body
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 20.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
 
                 // 1. Name
                 OutlinedTextField(
@@ -127,6 +144,9 @@ fun AddEditPaperDialog(
                     label = { Text("Наименование бумаги *") },
                     placeholder = { Text("например, Upm Finesse Gloss") },
                     isError = isErrorName,
+                    supportingText = if (isErrorName) {
+                        { Text("Укажите наименование бумаги", color = MaterialTheme.colorScheme.error) }
+                    } else null,
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -338,34 +358,49 @@ fun AddEditPaperDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
-                // Action buttons
+            // Pinned Footer Actions
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 4.dp
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Отмена", color = Color(0xFF64748B))
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.height(44.dp)
+                    ) {
+                        Text("Отмена", color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Button(
                         onClick = {
-                            if (name.isBlank()) {
-                                isErrorName = true
-                                return@Button
-                            }
-
+                            keyboardController?.hide()
+                            val rawName = name.trim()
                             val density = densityGsmStr.toIntOrNull() ?: 130
-                            val thicknessCm = thicknessCmStr.toDoubleOrNull() ?: 0.0
-                            val sheetsCount = sheetsCountStr.toIntOrNull() ?: 0
+                            val thicknessCm = thicknessCmStr.toDoubleOrNull() ?: 10.0
+                            val sheetsCount = sheetsCountStr.toIntOrNull() ?: 1000
                             val minThreshold = minThresholdStr.toIntOrNull() ?: 200
+
+                            val finalName = if (rawName.isNotEmpty()) {
+                                rawName
+                            } else {
+                                "$paperType $density г/м² ($format)".trim()
+                            }
 
                             val newItem = PaperItem(
                                 id = item?.id ?: "",
-                                name = name.trim(),
+                                name = finalName,
                                 densityGsm = density,
                                 thicknessCm = thicknessCm,
                                 sheetsCount = sheetsCount,
@@ -380,13 +415,20 @@ fun AddEditPaperDialog(
 
                             onSave(newItem)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = CyanPrimary),
-                        modifier = Modifier.testTag("save_paper_button")
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SlateNavy,
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .height(48.dp)
+                            .testTag("save_paper_button")
                     ) {
-                        Text("Сохранить", fontWeight = FontWeight.Bold)
+                        Text("Сохранить", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     }
                 }
             }
         }
     }
+}
 }

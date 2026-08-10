@@ -5,10 +5,10 @@ import com.google.firebase.firestore.DocumentId
 data class PaperItem(
     @DocumentId
     var id: String = "",
-    val name: String,                  // Наименование бумаги (e.g., "Upm Finesse Gloss")
-    val densityGsm: Int,               // Плотность бумаги (г/м², e.g., 130)
-    val thicknessCm: Double,           // Остаток в сантиметрах (см, e.g., 12.5)
-    val sheetsCount: Int,              // Остаток в листах (e.g., 1250)
+    val name: String = "",                 // Наименование бумаги (e.g., "Upm Finesse Gloss")
+    val densityGsm: Int = 0,              // Плотность бумаги (г/м², e.g., 130)
+    val thicknessCm: Double = 0.0,         // Остаток в сантиметрах (см, e.g., 12.5)
+    val sheetsCount: Int = 0,             // Остаток в листах (e.g., 1250)
     val format: String = "SRA3",       // Формат (SRA3, A3, A4, 70x100)
     val paperType: String = "Мелованная", // Тип (Мелованная глянцевая, Офсетная, etc.)
     val caliperMicrons: Double = 100.0, // Толщина 1 листа в мкм (микронах)

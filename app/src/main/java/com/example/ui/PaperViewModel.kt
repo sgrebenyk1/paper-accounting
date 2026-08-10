@@ -29,7 +29,7 @@ class PaperViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: PaperRepository
 
     init {
-        repository = PaperRepository()
+        repository = PaperRepository(application.applicationContext)
         viewModelScope.launch {
             repository.prepopulateIfEmpty()
         }

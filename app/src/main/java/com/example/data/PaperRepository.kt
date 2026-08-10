@@ -1,16 +1,22 @@
 package com.example.data
 
+import android.content.Context
 import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 import java.util.UUID
 
-class PaperRepository {
+class PaperRepository(private val context: Context? = null) {
 
     private val sampleItems = listOf(
         PaperItem(
@@ -132,7 +138,80 @@ class PaperRepository {
         )
     )
 
-    private val localItems = MutableStateFlow(sampleItems)
+    private fun paperItemToJson(item: PaperItem): JSONObject {
+        return JSONObject().apply {
+            put("id", item.id)
+            put("name", item.name)
+            put("densityGsm", item.densityGsm)
+            put("thicknessCm", item.thicknessCm)
+            put("sheetsCount", item.sheetsCount)
+            put("format", item.format)
+            put("paperType", item.paperType)
+            put("caliperMicrons", item.caliperMicrons)
+            put("minThresholdSheets", item.minThresholdSheets)
+            put("location", item.location)
+            put("notes", item.notes)
+            put("updatedAt", item.updatedAt)
+        }
+    }
+
+    private fun jsonToPaperItem(obj: JSONObject): PaperItem {
+        return PaperItem(
+            id = obj.optString("id", ""),
+            name = obj.optString("name", ""),
+            densityGsm = obj.optInt("densityGsm", 0),
+            thicknessCm = obj.optDouble("thicknessCm", 0.0),
+            sheetsCount = obj.optInt("sheetsCount", 0),
+            format = obj.optString("format", "SRA3"),
+            paperType = obj.optString("paperType", "Мелованная"),
+            caliperMicrons = obj.optDouble("caliperMicrons", 100.0),
+            minThresholdSheets = obj.optInt("minThresholdSheets", 200),
+            location = obj.optString("location", ""),
+            notes = obj.optString("notes", ""),
+            updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
+        )
+    }
+
+    private fun saveLocalToDisk(items: List<PaperItem>) {
+        val ctx = context ?: return
+        try {
+            val array = JSONArray()
+            items.forEach { array.put(paperItemToJson(it)) }
+            val file = File(ctx.filesDir, "paper_items_v1.json")
+            file.writeText(array.toString())
+        } catch (e: Exception) {
+            Log.e("PaperRepository", "Error saving items to local disk", e)
+        }
+    }
+
+    private fun loadLocalFromDisk(): List<PaperItem>? {
+        val ctx = context ?: return null
+        try {
+            val file = File(ctx.filesDir, "paper_items_v1.json")
+            if (!file.exists()) return null
+            val content = file.readText()
+            if (content.isBlank()) return null
+            val array = JSONArray(content)
+            val list = mutableListOf<PaperItem>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(jsonToPaperItem(obj))
+            }
+            return if (list.isNotEmpty()) list else null
+        } catch (e: Exception) {
+            Log.e("PaperRepository", "Error loading items from local disk", e)
+            return null
+        }
+    }
+
+    private val initialItems: List<PaperItem> = loadLocalFromDisk() ?: run {
+        saveLocalToDisk(sampleItems)
+        sampleItems
+    }
+
+    private val localItems = MutableStateFlow(initialItems)
+
+    val allPapers: StateFlow<List<PaperItem>> = localItems.asStateFlow()
 
     private val firestore: FirebaseFirestore? = try {
         FirebaseFirestore.getInstance()
@@ -143,105 +222,127 @@ class PaperRepository {
 
     private val collection = firestore?.collection("paper_items")
 
-    val allPapers: Flow<List<PaperItem>> = if (collection != null) {
-        callbackFlow {
-            val subscription = collection.addSnapshotListener { snapshot, error ->
+    init {
+        setupFirestoreListener()
+    }
+
+    private fun setupFirestoreListener() {
+        val col = collection ?: return
+        try {
+            col.addSnapshotListener { snapshot, error ->
                 if (error != null) {
-                    Log.e("PaperRepository", "Firestore listen error, falling back to local", error)
-                    trySend(localItems.value)
+                    Log.e("PaperRepository", "Firestore listen error: ${error.message}", error)
                     return@addSnapshotListener
                 }
-                if (snapshot != null) {
-                    val items = snapshot.documents.mapNotNull { it.toObject(PaperItem::class.java) }
-                    if (items.isNotEmpty()) {
-                        trySend(items)
-                    } else {
-                        trySend(localItems.value)
+                if (snapshot != null && !snapshot.isEmpty) {
+                    val items = snapshot.documents.mapNotNull { doc ->
+                        try {
+                            doc.toObject(PaperItem::class.java)?.copy(id = doc.id)
+                        } catch (e: Exception) {
+                            Log.e("PaperRepository", "Error deserializing document ${doc.id}", e)
+                            null
+                        }
                     }
-                } else {
-                    trySend(localItems.value)
+                    if (items.isNotEmpty()) {
+                        val localMap = localItems.value.associateBy { it.id }.toMutableMap()
+                        items.forEach { remoteItem ->
+                            localMap[remoteItem.id] = remoteItem
+                        }
+                        val updated = localMap.values.toList()
+                        if (updated != localItems.value) {
+                            localItems.value = updated
+                            saveLocalToDisk(updated)
+                        }
+                    }
                 }
             }
-            awaitClose { subscription.remove() }
+        } catch (e: Exception) {
+            Log.e("PaperRepository", "Error setting up Firestore listener", e)
         }
-    } else {
-        localItems.asStateFlow()
     }
 
     suspend fun insert(paper: PaperItem): String {
         val col = collection
-        if (col != null) {
-            return try {
-                val ref = col.document()
-                val paperWithId = paper.copy(id = ref.id)
-                ref.set(paperWithId).await()
-                ref.id
-            } catch (e: Exception) {
-                Log.e("PaperRepository", "Error inserting to Firestore", e)
-                insertLocal(paper)
-            }
-        } else {
-            return insertLocal(paper)
-        }
-    }
-
-    private fun insertLocal(paper: PaperItem): String {
         val newId = if (paper.id.isNotEmpty()) paper.id else UUID.randomUUID().toString()
-        val newItem = paper.copy(id = newId)
-        localItems.value = localItems.value + newItem
+        val paperWithId = paper.copy(id = newId)
+        
+        // Update local immediately for responsive UI
+        insertLocal(paperWithId)
+
+        if (col != null) {
+            try {
+                withTimeoutOrNull(1000L) {
+                    col.document(newId).set(paperWithId).await()
+                }
+            } catch (e: Throwable) {
+                Log.e("PaperRepository", "Error inserting to Firestore", e)
+            }
+        }
         return newId
     }
 
+    private fun insertLocal(paper: PaperItem) {
+        val updated = localItems.value.filter { it.id != paper.id } + paper
+        localItems.value = updated
+        saveLocalToDisk(updated)
+    }
+
     suspend fun update(paper: PaperItem) {
+        updateLocal(paper)
         val col = collection
         if (col != null && paper.id.isNotEmpty()) {
             try {
-                col.document(paper.id).set(paper).await()
-            } catch (e: Exception) {
+                withTimeoutOrNull(1000L) {
+                    col.document(paper.id).set(paper).await()
+                }
+            } catch (e: Throwable) {
                 Log.e("PaperRepository", "Error updating Firestore", e)
-                updateLocal(paper)
             }
-        } else {
-            updateLocal(paper)
         }
     }
 
     private fun updateLocal(paper: PaperItem) {
-        localItems.value = localItems.value.map { if (it.id == paper.id) paper else it }
+        val updated = localItems.value.map { if (it.id == paper.id) paper else it }
+        localItems.value = updated
+        saveLocalToDisk(updated)
     }
 
     suspend fun deleteById(id: String) {
+        deleteLocal(id)
         val col = collection
         if (col != null && id.isNotEmpty()) {
             try {
-                col.document(id).delete().await()
-            } catch (e: Exception) {
+                withTimeoutOrNull(1000L) {
+                    col.document(id).delete().await()
+                }
+            } catch (e: Throwable) {
                 Log.e("PaperRepository", "Error deleting from Firestore", e)
-                deleteLocal(id)
             }
-        } else {
-            deleteLocal(id)
         }
     }
 
     private fun deleteLocal(id: String) {
-        localItems.value = localItems.value.filter { it.id != id }
+        val updated = localItems.value.filter { it.id != id }
+        localItems.value = updated
+        saveLocalToDisk(updated)
     }
 
     suspend fun prepopulateIfEmpty() {
         val col = collection ?: return
         try {
-            val countQuery = col.count().get(com.google.firebase.firestore.AggregateSource.SERVER).await()
-            if (countQuery.count == 0L) {
-                firestore?.runBatch { batch ->
-                    sampleItems.forEach { item ->
-                        val ref = col.document()
-                        batch.set(ref, item.copy(id = ref.id))
-                    }
-                }?.await()
+            withTimeoutOrNull(1000L) {
+                val snapshot = col.limit(1).get().await()
+                if (snapshot.isEmpty) {
+                    firestore?.runBatch { batch ->
+                        localItems.value.forEach { item ->
+                            val ref = col.document()
+                            batch.set(ref, item.copy(id = ref.id))
+                        }
+                    }?.await()
+                }
             }
-        } catch (e: Exception) {
-            Log.e("PaperRepository", "Error prepopulating Firestore", e)
+        } catch (e: Throwable) {
+            Log.e("PaperRepository", "Error checking or prepopulating Firestore", e)
         }
     }
 }

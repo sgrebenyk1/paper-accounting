@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "975463763536",
+    "project_id": "paper-accounting-e384e",
+    "storage_bucket": "paper-accounting-e384e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:975463763536:android:d843259065558b0c984b55",
+        "android_client_info": {
+          "package_name": "com.aistudio.paperstock.printshop"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAu_Y9q36Jj_Ba-3Ql2sYSFRX7xlDoux18"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
